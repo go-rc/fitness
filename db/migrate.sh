@@ -18,11 +18,11 @@ EOF
 }
 
 DB="fitness"
-HOST="localhost"
+SERVER="localhost"
 PORT="27017"
 DROP=0
 
-while getopts "hd:h:p:x" opt; do
+while getopts "hd:s:p:x" opt; do
 	case "$opt" in
 		h)
 			usage
@@ -31,8 +31,8 @@ while getopts "hd:h:p:x" opt; do
 		d)
 			DB="$OPTARG"
 			;;
-		h)
-			HOST="$OPTARG"
+		s)
+			SERVER="$OPTARG"
 			;;
 		p)
 			PORT="$OPTARG"
@@ -43,7 +43,7 @@ while getopts "hd:h:p:x" opt; do
 	esac
 done
 
-DBADDRESS="$HOST:$PORT/$DB"
+DBADDRESS="$SERVER:$PORT/$DB"
 
 if [ $DROP -eq 1 ]
 then
