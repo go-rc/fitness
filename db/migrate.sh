@@ -5,8 +5,8 @@ usage()
 	cat << EOF
 usage: $0 options
 
-This script manages the MongoDB database. By executing all scripts
-found at ./migrations/*.js. Note: script are runin alphabetical
+This script manages the MongoDB database by executing all scripts
+found at ./migrations/*.js. Note: scripts are run in alphabetical
 order, and should be idempotent.
 
 OPTIONS:
