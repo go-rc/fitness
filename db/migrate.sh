@@ -44,10 +44,12 @@ while getopts "hd:h:p:x" opt; do
 done
 
 DBADDRESS="$HOST:$PORT/$DB"
+
 if [ $DROP -eq 1 ]
 then
 	echo "Dropping database: $DB"
 	mongo $DBADDRESS --eval "db.dropDatabase()"
+	exit 0
 fi
 
 SCRIPTS=./migrations/*.js

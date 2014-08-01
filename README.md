@@ -9,8 +9,21 @@ Requirements
 * Go 1.3
 * Mongo DB
 
-Setting up the Database
------------------------
+Building/Running the Tracker
+----------------------------
+
+    $ go get github.com/tomharrison/fitness
+    $ cd $GOPATH/src/github.com/tomharrison/fitness
+    $ make db
+    $ make serve
+
+Clear out the Database
+----------------------
+
+    $ make dropdb
+
+Advanced Use of the Database Migration Tool
+-------------------------------------------
 
     $ cd db
     $ ./migrate.sh -h
@@ -28,9 +41,3 @@ Setting up the Database
 
     $ ./migrate.sh -h localhost -p 27017 -d fitness
 
-Building/Running the Tracker
-----------------------------
-
-    $ go get github.com/tomharrison/fitness
-    $ cd $GOPATH/src/github.com/tomharrison/fitness
-    $ make serve
