@@ -34,10 +34,10 @@ Advanced Use of the Database Migration Tool
     order, and should be idempotent.
 
     OPTIONS:
-      -d    Name of the database to create/use.
-      -h    Hostname to connect to.
-      -p    Port to connect on.
-      -x    Drop the database.
+      -d    Name of the database to create/use. Defaults to fitness.
+      -s    Server to connect to. Defaults to localhost.
+      -p    Port to connect on. Defaults to 27017.
+      -x    Drop the database. Skipped by default.
 
     $ ./migrate.sh -h localhost -p 27017 -d fitness
 
