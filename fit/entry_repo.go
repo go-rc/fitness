@@ -25,3 +25,13 @@ func (r *EntryRepository) Find() (*[]Entry, error) {
 
 	return &results, nil
 }
+
+func (r *EntryRepository) Upsert(e *Entry) error {
+	_, err := r.collection.Upsert(bson.M{"date": e.Date}, e)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

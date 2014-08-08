@@ -10,5 +10,6 @@ func NewFitnessApi(db *mgo.Database, router *mux.Router) {
 	entriesRepo := NewEntryRepository(entriesCollection)
 	entriesController := NewEntriesController(entriesRepo)
 
-	router.HandleFunc("/entries", entriesController.IndexHandler)
+	router.HandleFunc("/entries", entriesController.IndexHandler).Methods("GET")
+	router.HandleFunc("/entries", entriesController.CreateHandler).Methods("POST")
 }
