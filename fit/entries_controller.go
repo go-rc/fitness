@@ -1,4 +1,4 @@
-package api
+package fit
 
 import (
 	"encoding/json"

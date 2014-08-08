@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"github.com/gorilla/mux"
-	"github.com/tomharrison/fitness/api"
+	"github.com/tomharrison/fitness/fit"
 	"gopkg.in/mgo.v2"
 	"net/http"
 )
@@ -55,7 +55,7 @@ func CreateServer(opts *ServerOptions) {
 	router := mux.NewRouter()
 	router.Handle("/", http.FileServer(http.Dir(opts.PubDir)))
 
-	api.NewFitnessApi(db, router.PathPrefix(opts.ApiPrefix).Subrouter())
+	fit.NewFitnessApi(db, router.PathPrefix(opts.ApiPrefix).Subrouter())
 
 	http.Handle("/", router)
 	http.ListenAndServe(":"+opts.Port, nil)

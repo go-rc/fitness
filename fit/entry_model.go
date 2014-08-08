@@ -1,4 +1,4 @@
-package api
+package fit
 
 import (
 	"gopkg.in/mgo.v2/bson"

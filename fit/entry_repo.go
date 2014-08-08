@@ -1,9 +1,11 @@
-package api
+package fit
 
 import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
+
+const EntriesCollectionName string = "entries"
 
 type EntryRepository struct {
 	collection *mgo.Collection

@@ -1,11 +1,9 @@
-package api
+package fit
 
 import (
 	"github.com/gorilla/mux"
 	"gopkg.in/mgo.v2"
 )
-
-const EntriesCollectionName string = "entries"
 
 func NewFitnessApi(db *mgo.Database, router *mux.Router) {
 	entriesCollection := db.C(EntriesCollectionName)
