@@ -21,10 +21,10 @@ import (
 
 // Names of the arguments which may be given as command line parameters.
 const (
-	EndDateFlag      string = "end"
-	PasswordFlag     string = "passwd"
-	StartDateFlag    string = "start"
-	UsernameFlag     string = "uname"
+	EndDateFlag   string = "end"
+	PasswordFlag  string = "passwd"
+	StartDateFlag string = "start"
+	UsernameFlag  string = "uname"
 )
 
 // Default values for all of the command line parameters.
@@ -137,7 +137,7 @@ func requestDietData(start *time.Time, end *time.Time, c *http.Client) *http.Res
 	return resp
 }
 
-// storeDietData parses CSV data from the given http response's body into 
+// storeDietData parses CSV data from the given http response's body into
 // Entry records and stores them in MongoDB via the given repository.
 func storeDietData(r *http.Response, repo *fit.EntryRepository) {
 	defer r.Body.Close()
