@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-
-LS_USER="tomharrison"
-LS_PASS=""
-LS_COOKIEJAR=$(mktemp ${TMPDIR}livestrongXXXX)
-
-curl --data "login_username=$LS_USER&login_password=$LS_PASS" -c $LS_COOKIEJAR https://www.livestrong.com/data
-curl --data "start_Month=08&start_Day=01&start_Year=2014&end_Month=08&end_Day=31&end_Year=2014&ftype=overview&fltype=csv" -c $LS_COOKIEJAR http://www.livestrong.com/thedailyplate/diary/csv/${LS_USER}/
-rm $LS_COOKIEJAR
