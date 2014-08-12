@@ -47,8 +47,7 @@ func main() {
 
 	login(opts.Username, opts.Password, client)
 
-	start, _ := time.Parse("2006-01-02", opts.StartDate)
-	end, _ := time.Parse("2006-01-02", opts.EndDate)
+	start, end := ParseDateOptions(opts)
 	dietResp, dietErr := requestDietData(&start, &end, client)
 	if dietErr != nil {
 		panic(err)
@@ -69,6 +68,12 @@ func GetOptions() *Options {
 
 	flag.Parse()
 	return opts
+}
+
+func ParseDateOptions(opts *Options) (time.Time, time.Time) {
+	start, _ := time.Parse("2006-01-02", opts.StartDate)
+	end, _ := time.Parse("2006-01-02", opts.EndDate)
+	return start, end
 }
 
 func login(username string, password string, c *http.Client) {
