@@ -40,22 +40,25 @@ func main() {
 	cookieJar, _ := cookiejar.New(nil)
 	client := &http.Client{Jar: cookieJar}
 
-	session, err := mgo.Dial(dbOpts.Host)
-	if err != nil {
-		panic(err)
-	}
-
 	login(opts.Username, opts.Password, client)
 
 	start, end := parseDateOptions(opts)
 	dietResp, dietErr := requestDietData(&start, &end, client)
 	if dietErr != nil {
-		panic(err)
+		panic(dietErr)
 	}
 
-	collection := session.DB(dbOpts.Database).C("entries")
+	_, collection := getMongo(dbOpts)
 	repo := fit.NewEntryRepository(collection)
 	storeDietData(dietResp, repo)
+}
+
+func getMongo(opts *fit.MongoOptions) (*mgo.Session, *mgo.Collection) {
+	session, err := mgo.Dial(opts.Host)
+	if err != nil {
+		panic(err)
+	}
+	return session, session.DB(opts.Database).C("entries")
 }
 
 func getOptions() *Options {
