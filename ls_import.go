@@ -35,6 +35,26 @@ const (
 	DefaultUsername  string = "tomharrison"
 )
 
+// Parameters and URL for the login form.
+const (
+	LoginFormEndpoint          string = "https://www.livestrong.com/login/"
+	LoginFormPasswordParameter string = "login_password"
+	LoginFormUsernameParameter string = "login_username"
+)
+
+// Parameters and URL for the CSV export.
+const (
+	CsvExportBaseUrl       string = "http://www.livestrong.com/thedailyplate/diary/csv/"
+	CsvStartMonthParameter string = "start_Month"
+	CsvStartDayParameter   string = "start_Day"
+	CsvStartYearParameter  string = "start_Year"
+	CsvEndMonthParameter   string = "end_Month"
+	CsvEndDayParameter     string = "end_Day"
+	CsvEndYearParameter    string = "end_Year"
+	CsvFileTypeParameter   string = "ftype"
+	CsvFormatParameter     string = "fltype"
+)
+
 // Options is a struct which encapsulates the settings which may be given
 // as command line arguments.
 type Options struct {
@@ -60,7 +80,7 @@ func main() {
 
 	// Download and store data.
 	login(opts.Username, opts.Password, client)
-	dietResp := requestDietData(&start, &end, client)
+	dietResp := requestDietData(&start, &end, opts.Username, client)
 	storeDietData(dietResp, repo)
 }
 
@@ -104,10 +124,10 @@ func parseDateOption(dateStr string) time.Time {
 // Precondition: the given http client has a cookie jar.
 func login(username string, password string, c *http.Client) {
 	params := make(url.Values)
-	params.Set("login_user", username)
-	params.Set("login_password", password)
+	params.Set(LoginFormUsernameParameter, username)
+	params.Set(LoginFormPasswordParameter, password)
 
-	resp, err := c.PostForm("https://www.livestrong.com/login/", params)
+	resp, err := c.PostForm(LoginFormEndpoint, params)
 	defer resp.Body.Close()
 
 	if err != nil {
@@ -119,18 +139,19 @@ func login(username string, password string, c *http.Client) {
 // http client. The response's payload will be CSV values each containing a date,
 // calorie goal, gross calories consumed, total calories burned, and a net calorie
 // count (gross minus burned).
-func requestDietData(start *time.Time, end *time.Time, c *http.Client) *http.Response {
+func requestDietData(start *time.Time, end *time.Time, username string, c *http.Client) *http.Response {
 	params := make(url.Values)
-	params.Set("start_Month", start.Format("01"))
-	params.Set("start_Day", start.Format("02"))
-	params.Set("start_Year", start.Format("2006"))
-	params.Set("end_Month", end.Format("01"))
-	params.Set("end_Day", end.Format("02"))
-	params.Set("end_Year", end.Format("2006"))
-	params.Set("ftype", "overview")
-	params.Set("fltype", "csv")
+	params.Set(CsvStartMonthParameter, start.Format("01"))
+	params.Set(CsvStartDayParameter, start.Format("02"))
+	params.Set(CsvStartYearParameter, start.Format("2006"))
+	params.Set(CsvEndMonthParameter, end.Format("01"))
+	params.Set(CsvEndDayParameter, end.Format("02"))
+	params.Set(CsvEndYearParameter, end.Format("2006"))
+	params.Set(CsvFileTypeParameter, "overview")
+	params.Set(CsvFormatParameter, "csv")
 
-	resp, err := c.PostForm("http://www.livestrong.com/thedailyplate/diary/csv/tomharrison/", params)
+	endpoint := CsvExportBaseUrl + username
+	resp, err := c.PostForm(endpoint, params)
 	if err != nil {
 		panic(err)
 	}
