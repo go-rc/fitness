@@ -34,7 +34,7 @@ type Options struct {
 }
 
 func main() {
-	opts := GetOptions()
+	opts := getOptions()
 	dbOpts := fit.ParseMongoOptions()
 
 	cookieJar, _ := cookiejar.New(nil)
@@ -47,7 +47,7 @@ func main() {
 
 	login(opts.Username, opts.Password, client)
 
-	start, end := ParseDateOptions(opts)
+	start, end := parseDateOptions(opts)
 	dietResp, dietErr := requestDietData(&start, &end, client)
 	if dietErr != nil {
 		panic(err)
@@ -58,7 +58,7 @@ func main() {
 	storeDietData(dietResp, repo)
 }
 
-func GetOptions() *Options {
+func getOptions() *Options {
 	opts := &Options{}
 
 	flag.StringVar(&opts.EndDate, EndDateFlag, DefaultEndDate, "End date")
@@ -70,7 +70,7 @@ func GetOptions() *Options {
 	return opts
 }
 
-func ParseDateOptions(opts *Options) (time.Time, time.Time) {
+func parseDateOptions(opts *Options) (time.Time, time.Time) {
 	start, _ := time.Parse("2006-01-02", opts.StartDate)
 	end, _ := time.Parse("2006-01-02", opts.EndDate)
 	return start, end
