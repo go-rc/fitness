@@ -6,11 +6,14 @@ package main
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/tomharrison/fitness/fit"
 	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -55,6 +58,24 @@ const (
 	CsvFormatParameter     string = "fltype"
 )
 
+// Parameters and URL for the weight graph/json page.
+const (
+	WeightFromMonthParameter    string = "from_Month"
+	WeightFromDayParameter      string = "from_Day"
+	WeightFromYearParameter     string = "from_Year"
+	WeightToMonthParameter      string = "to_Month"
+	WeightToDayParameter        string = "to_Day"
+	WeightToYearParameter       string = "to_Year"
+	WeightShowCaloriesParameter string = "show_net_cals_plz"
+	WeightRefreshParameter      string = "refresh"
+	WeightGraphEndpoint         string = "http://www.livestrong.com/thedailyplate/users/weight/"
+)
+
+type WeightRecord struct {
+	Weight      float64 `json:"weight,omitifempty"`
+	DisplayDate string  `json:"datestamp,omitifempty"`
+}
+
 // Options is a struct which encapsulates the settings which may be given
 // as command line arguments.
 type Options struct {
@@ -76,12 +97,15 @@ func main() {
 	client := &http.Client{Jar: cookieJar}
 	mongo := getMongo(dbOpts)
 	entries := mongo.DB(dbOpts.Database).C("entries")
-	repo := fit.NewEntryRepository(entries)
 
 	// Download and store data.
 	login(opts.Username, opts.Password, client)
+
 	dietResp := requestDietData(&start, &end, opts.Username, client)
-	storeDietData(dietResp, repo)
+	storeDietData(dietResp, entries)
+
+	weightResp := requestWeightData(&start, &end, client)
+	storeWeightData(weightResp, entries)
 }
 
 // Connect to MongoDB.
@@ -158,9 +182,29 @@ func requestDietData(start *time.Time, end *time.Time, username string, c *http.
 	return resp
 }
 
+// Retrieve weight history by requesting the weight graph page, which has the desired
+// data in the response body.
+func requestWeightData(start *time.Time, end *time.Time, c *http.Client) *http.Response {
+	params := make(url.Values)
+	params.Set(WeightFromMonthParameter, start.Format("01"))
+	params.Set(WeightFromDayParameter, start.Format("02"))
+	params.Set(WeightFromYearParameter, start.Format("2006"))
+	params.Set(WeightToMonthParameter, end.Format("01"))
+	params.Set(WeightToDayParameter, end.Format("02"))
+	params.Set(WeightToYearParameter, end.Format("2006"))
+	params.Set(WeightShowCaloriesParameter, "")
+	params.Set(WeightRefreshParameter, "Refresh")
+
+	resp, err := c.PostForm(WeightGraphEndpoint, params)
+	if err != nil {
+		panic(err)
+	}
+	return resp
+}
+
 // storeDietData parses CSV data from the given http response's body into
 // Entry records and stores them in MongoDB via the given repository.
-func storeDietData(r *http.Response, repo *fit.EntryRepository) {
+func storeDietData(r *http.Response, entries *mgo.Collection) {
 	defer r.Body.Close()
 	reader := csv.NewReader(r.Body)
 	lineCount := 0
@@ -179,8 +223,46 @@ func storeDietData(r *http.Response, repo *fit.EntryRepository) {
 		}
 
 		entry := newEntryFromRecord(record)
-		repo.Upsert(entry)
+		update := bson.M{"$set": bson.M{
+			"date":              entry.Date,
+			"calorie_goal":      entry.CalorieGoal,
+			"calories_consumed": entry.CaloriesConsumed,
+			"calories_burned":   entry.CaloriesBurned,
+			"net_calories":      entry.NetCalories,
+		}}
+		entries.Upsert(bson.M{"date": entry.Date}, update)
 		lineCount += 1
+	}
+}
+
+// Parses weight JSON data out of the given response body, and stores it in
+// the given MongoDB collection.
+func storeWeightData(r *http.Response, entries *mgo.Collection) {
+	defer r.Body.Close()
+	body, bodyErr := ioutil.ReadAll(r.Body)
+	if bodyErr != nil {
+		panic(bodyErr)
+	}
+
+	reg := regexp.MustCompile("var weight_data = (\\[[^\\[]+\\])")
+	match := reg.FindSubmatch(body)
+	if match == nil || len(match) != 2 {
+		return
+	}
+
+	data := make([]WeightRecord, 0)
+	weightErr := json.Unmarshal(match[1], &data)
+	if weightErr != nil {
+		panic(weightErr)
+	}
+
+	for _, record := range data {
+		entry := newEntryFromWeightRecord(&record)
+		update := bson.M{"$set": bson.M{
+			"weight": entry.Weight,
+			"date":   entry.Date,
+		}}
+		entries.Upsert(bson.M{"date": entry.Date}, update)
 	}
 }
 
@@ -195,5 +277,11 @@ func newEntryFromRecord(r []string) *fit.Entry {
 	e.CaloriesConsumed, _ = strconv.ParseFloat(r[2], 64)
 	e.CaloriesBurned, _ = strconv.ParseFloat(r[3], 64)
 	e.NetCalories, _ = strconv.ParseFloat(r[4], 64)
+	return e
+}
+
+func newEntryFromWeightRecord(r *WeightRecord) *fit.Entry {
+	e := &fit.Entry{Weight: r.Weight}
+	e.Date, _ = time.Parse("2006-01-02", r.DisplayDate)
 	return e
 }
