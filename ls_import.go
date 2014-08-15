@@ -5,76 +5,25 @@
 package main
 
 import (
-	"encoding/csv"
-	"encoding/json"
 	"flag"
-	"fmt"
+	"github.com/tomharrison/go-livestrong"
 	"github.com/tomharrison/fitness/fit"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"net/http/cookiejar"
-	"net/url"
-	"regexp"
-	"strconv"
 	"time"
 )
 
-// Names of the arguments which may be given as command line parameters.
+// Command line parameter names and default values.
 const (
 	EndDateFlag   string = "end"
 	PasswordFlag  string = "passwd"
 	StartDateFlag string = "start"
 	UsernameFlag  string = "uname"
-)
-
-// Default values for all of the command line parameters.
-const (
 	DefaultEndDate   string = "2012-11-01"
 	DefaultPassword  string = ""
 	DefaultStartDate string = "2012-11-30"
 	DefaultUsername  string = "tomharrison"
 )
-
-// Parameters and URL for the login form.
-const (
-	LoginFormEndpoint          string = "https://www.livestrong.com/login/"
-	LoginFormPasswordParameter string = "login_password"
-	LoginFormUsernameParameter string = "login_username"
-)
-
-// Parameters and URL for the CSV export.
-const (
-	CsvExportBaseUrl       string = "http://www.livestrong.com/thedailyplate/diary/csv/"
-	CsvStartMonthParameter string = "start_Month"
-	CsvStartDayParameter   string = "start_Day"
-	CsvStartYearParameter  string = "start_Year"
-	CsvEndMonthParameter   string = "end_Month"
-	CsvEndDayParameter     string = "end_Day"
-	CsvEndYearParameter    string = "end_Year"
-	CsvFileTypeParameter   string = "ftype"
-	CsvFormatParameter     string = "fltype"
-)
-
-// Parameters and URL for the weight graph/json page.
-const (
-	WeightFromMonthParameter    string = "from_Month"
-	WeightFromDayParameter      string = "from_Day"
-	WeightFromYearParameter     string = "from_Year"
-	WeightToMonthParameter      string = "to_Month"
-	WeightToDayParameter        string = "to_Day"
-	WeightToYearParameter       string = "to_Year"
-	WeightShowCaloriesParameter string = "show_net_cals_plz"
-	WeightRefreshParameter      string = "refresh"
-	WeightGraphEndpoint         string = "http://www.livestrong.com/thedailyplate/users/weight/"
-)
-
-type WeightRecord struct {
-	Weight      float64 `json:"weight,omitifempty"`
-	DisplayDate string  `json:"datestamp,omitifempty"`
-}
 
 // Options is a struct which encapsulates the settings which may be given
 // as command line arguments.
@@ -93,19 +42,17 @@ func main() {
 	end := parseDateOption(opts.EndDate)
 
 	// Initialize dependencies.
-	cookieJar, _ := cookiejar.New(nil)
-	client := &http.Client{Jar: cookieJar}
+	livestrong, lsErr := livestrong.NewSiteClient(opts.Username, opts.Password)
+	if lsErr != nil {
+		panic(lsErr)
+	}
+
 	mongo := getMongo(dbOpts)
 	entries := mongo.DB(dbOpts.Database).C("entries")
 
 	// Download and store data.
-	login(opts.Username, opts.Password, client)
-
-	dietResp := requestDietData(&start, &end, opts.Username, client)
-	storeDietData(dietResp, entries)
-
-	weightResp := requestWeightData(&start, &end, client)
-	storeWeightData(weightResp, entries)
+	importDietData(&start, &end, livestrong, entries)
+	importWeightData(&start, &end, livestrong, entries)
 }
 
 // Connect to MongoDB.
@@ -142,87 +89,17 @@ func parseDateOption(dateStr string) time.Time {
 	return d
 }
 
-// Log into Livestrong.com with the given username and password, via the given
-// http client.
-//
-// Precondition: the given http client has a cookie jar.
-func login(username string, password string, c *http.Client) {
-	params := make(url.Values)
-	params.Set(LoginFormUsernameParameter, username)
-	params.Set(LoginFormPasswordParameter, password)
-
-	resp, err := c.PostForm(LoginFormEndpoint, params)
-	defer resp.Body.Close()
-
-	if err != nil {
-		panic(err)
-	}
-}
-
-// Request diet data logged between the given start and end times, via the given
-// http client. The response's payload will be CSV values each containing a date,
-// calorie goal, gross calories consumed, total calories burned, and a net calorie
-// count (gross minus burned).
-func requestDietData(start *time.Time, end *time.Time, username string, c *http.Client) *http.Response {
-	params := make(url.Values)
-	params.Set(CsvStartMonthParameter, start.Format("01"))
-	params.Set(CsvStartDayParameter, start.Format("02"))
-	params.Set(CsvStartYearParameter, start.Format("2006"))
-	params.Set(CsvEndMonthParameter, end.Format("01"))
-	params.Set(CsvEndDayParameter, end.Format("02"))
-	params.Set(CsvEndYearParameter, end.Format("2006"))
-	params.Set(CsvFileTypeParameter, "overview")
-	params.Set(CsvFormatParameter, "csv")
-
-	endpoint := CsvExportBaseUrl + username
-	resp, err := c.PostForm(endpoint, params)
-	if err != nil {
-		panic(err)
-	}
-	return resp
-}
-
-// Retrieve weight history by requesting the weight graph page, which has the desired
-// data in the response body.
-func requestWeightData(start *time.Time, end *time.Time, c *http.Client) *http.Response {
-	params := make(url.Values)
-	params.Set(WeightFromMonthParameter, start.Format("01"))
-	params.Set(WeightFromDayParameter, start.Format("02"))
-	params.Set(WeightFromYearParameter, start.Format("2006"))
-	params.Set(WeightToMonthParameter, end.Format("01"))
-	params.Set(WeightToDayParameter, end.Format("02"))
-	params.Set(WeightToYearParameter, end.Format("2006"))
-	params.Set(WeightShowCaloriesParameter, "")
-	params.Set(WeightRefreshParameter, "Refresh")
-
-	resp, err := c.PostForm(WeightGraphEndpoint, params)
-	if err != nil {
-		panic(err)
-	}
-	return resp
-}
-
 // storeDietData parses CSV data from the given http response's body into
 // Entry records and stores them in MongoDB via the given repository.
-func storeDietData(r *http.Response, entries *mgo.Collection) {
-	defer r.Body.Close()
-	reader := csv.NewReader(r.Body)
-	lineCount := 0
-	for {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			fmt.Println("Error: ", err)
-			return
-		}
+func importDietData(start *time.Time, end *time.Time, ls *livestrong.SiteClient, entries *mgo.Collection) {
+	dietRecords, err := ls.Diet.Query(start, end)
+	if err != nil {
+		panic(err)
+	}
 
-		if lineCount == 0 {
-			lineCount += 1
-			continue
-		}
+	for _, entry := range dietRecords {
+		criteria := bson.M{"date": entry.Date}
 
-		entry := newEntryFromRecord(record)
 		update := bson.M{"$set": bson.M{
 			"date":              entry.Date,
 			"calorie_goal":      entry.CalorieGoal,
@@ -230,58 +107,27 @@ func storeDietData(r *http.Response, entries *mgo.Collection) {
 			"calories_burned":   entry.CaloriesBurned,
 			"net_calories":      entry.NetCalories,
 		}}
-		entries.Upsert(bson.M{"date": entry.Date}, update)
-		lineCount += 1
+
+		entries.Upsert(criteria, update)
 	}
 }
 
 // Parses weight JSON data out of the given response body, and stores it in
 // the given MongoDB collection.
-func storeWeightData(r *http.Response, entries *mgo.Collection) {
-	defer r.Body.Close()
-	body, bodyErr := ioutil.ReadAll(r.Body)
-	if bodyErr != nil {
-		panic(bodyErr)
-	}
-
-	reg := regexp.MustCompile("var weight_data = (\\[[^\\[]+\\])")
-	match := reg.FindSubmatch(body)
-	if match == nil || len(match) != 2 {
-		return
-	}
-
-	data := make([]WeightRecord, 0)
-	weightErr := json.Unmarshal(match[1], &data)
-	if weightErr != nil {
-		panic(weightErr)
+func importWeightData(start *time.Time, end *time.Time, ls *livestrong.SiteClient, entries *mgo.Collection) {
+	data, err := ls.Weight.Query(start, end)
+	if err != nil {
+		panic(err)
 	}
 
 	for _, record := range data {
-		entry := newEntryFromWeightRecord(&record)
-		update := bson.M{"$set": bson.M{
-			"weight": entry.Weight,
-			"date":   entry.Date,
-		}}
-		entries.Upsert(bson.M{"date": entry.Date}, update)
+		entryDate, dateErr := time.Parse("2006-01-02", record.DisplayDate)
+		if dateErr != nil {
+			continue
+		}
+
+		criteria := bson.M{"date": entryDate}
+		update := bson.M{"$set": bson.M{"date": entryDate, "weight": record.Weight}}
+		entries.Upsert(criteria, update)
 	}
-}
-
-// newEntryFromRecord is a factory function which intializes the Entry type
-// using an array of strings which were parsed from a CSV record.
-func newEntryFromRecord(r []string) *fit.Entry {
-	e := &fit.Entry{}
-	reg := regexp.MustCompile("[a-z]{2},")
-	r[0] = reg.ReplaceAllString(r[0], ",")
-	e.Date, _ = time.Parse("January _2, 2006", r[0])
-	e.CalorieGoal, _ = strconv.ParseFloat(r[1], 64)
-	e.CaloriesConsumed, _ = strconv.ParseFloat(r[2], 64)
-	e.CaloriesBurned, _ = strconv.ParseFloat(r[3], 64)
-	e.NetCalories, _ = strconv.ParseFloat(r[4], 64)
-	return e
-}
-
-func newEntryFromWeightRecord(r *WeightRecord) *fit.Entry {
-	e := &fit.Entry{Weight: r.Weight}
-	e.Date, _ = time.Parse("2006-01-02", r.DisplayDate)
-	return e
 }
