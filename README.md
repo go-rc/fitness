@@ -41,3 +41,21 @@ Advanced Use of the Database Migration Tool
 
     $ ./migrate.sh -h localhost -p 27017 -d fitness
 
+Import Data from Livestrong
+---------------------------
+
+Assuming you have a local MongoDB with a database called fitness, and you've created an "entries" collection by running the database migration tool, do:
+
+    $ make all
+    $ ./ls_import -uname myusername -passwd foobar123 -start "2014-07-01" -end "2014-07-30"
+
+Here's a complete list of the importer's command line parameters:
+
+Parameter | Description                | Default Value
+----------|----------------------------|--------------
+start     | First date to export       | 2012-11-01
+end       | Last date to export        | 2012-11-30
+uname     | Livestrong.com username    | tomharrison
+passwd    | Livestrong.com password    | none
+db        | Name of a MongoDB database | fitness
+dbHost    | MongoDB host               | 127.0.0.1
