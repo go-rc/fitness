@@ -6,8 +6,8 @@ package main
 
 import (
 	"flag"
-	"github.com/tomharrison/go-livestrong"
 	"github.com/tomharrison/fitness/fit"
+	"github.com/tomharrison/go-livestrong"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"time"
@@ -15,10 +15,10 @@ import (
 
 // Command line parameter names and default values.
 const (
-	EndDateFlag   string = "end"
-	PasswordFlag  string = "passwd"
-	StartDateFlag string = "start"
-	UsernameFlag  string = "uname"
+	EndDateFlag      string = "end"
+	PasswordFlag     string = "passwd"
+	StartDateFlag    string = "start"
+	UsernameFlag     string = "uname"
 	DefaultEndDate   string = "2012-11-01"
 	DefaultPassword  string = ""
 	DefaultStartDate string = "2012-11-30"
